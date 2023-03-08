@@ -1,80 +1,69 @@
-import { Component } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from './Layout';
 import { ContactList } from "./ContactList/ContactList";
 import { ContactForm } from "./ContactForm/ContactForm";
 import { Filter } from "./Filter/Filter";
 import initContacts from '../contacts.json';
 
-export class App extends Component {
+const LS_CONTACTS_KEY = 'PhoneBook_Contacts';
 
-  LS_CONTACTS_KEY = 'PhoneBook_Contacts';
-
-  state = {
-    contacts: [],
-    filter: '',
-  }
-
-  componentDidMount() {
-    const jsonContacts = localStorage.getItem(this.LS_CONTACTS_KEY);
-    if (jsonContacts !== null) {
-      try {
-        this.setState({ contacts: JSON.parse(jsonContacts) });
-        return;
-      } catch (err) {
-        console.error(`Error: invalid saved contacts in LocalStorage: ${this.LS_CONTACTS_KEY} - ${err}`);
-      }
-    }
-
-    this.setState({ contacts: [...initContacts] });
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    if (this.state.contacts !== prevState.contacts) {
-      try {
-        localStorage.setItem(this.LS_CONTACTS_KEY, JSON.stringify(this.state.contacts));
-      } catch (err) {
-        console.error(`Error: failure saving contacts in LocalStorage: ${this.LS_CONTACTS_KEY} - ${err}`);
-      }
+const getInitialContacts = () => {
+  const jsonContacts = localStorage.getItem(LS_CONTACTS_KEY);
+  if (jsonContacts !== null) {
+    try {
+      return JSON.parse(jsonContacts);
+    } catch (err) {
+      console.error(`Error: invalid saved contacts in LocalStorage: ${LS_CONTACTS_KEY} - ${err}`);
     }
   }
+  return [...initContacts];
+}
 
-  handleAddContact = newContact => {
+export const App = () => {
+
+  const [contacts, setContacts] = useState(getInitialContacts);
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_CONTACTS_KEY, JSON.stringify(contacts));
+    } catch (err) {
+      console.error(`Error: failure saving contacts in LocalStorage: ${LS_CONTACTS_KEY} - ${err}`);
+    }
+  }, [contacts]);
+
+  const handleAddContact = newContact => {
     const normName = newContact.name.toLowerCase();
-    if (this.state.contacts.find(({ name }) => name.toLowerCase() === normName)) {
+    if (contacts.find(({ name }) => name.toLowerCase() === normName)) {
       alert(`${newContact.name} is already in contacts!`);
       return false;
     }
-    this.setState(prevState => ({ contacts: [...prevState.contacts, newContact] }));
+    setContacts(prevContacts => ([...prevContacts, newContact]));
     return true;
   }
 
-  handleDeleteContact = idToDel => this.setState(prevState => ({
-    contacts: prevState.contacts.filter(({id}) => (id !== idToDel))
-  }));
+  const handleDeleteContact = idToDel =>
+    setContacts(prevContacts => prevContacts.filter(({ id }) => (id !== idToDel)));
 
-  onFilterChange = evt => this.setState({ filter: evt.currentTarget.value }); 
+  const onFilterChange = evt => setFilter(evt.currentTarget.value); 
 
-  getVisibleContacts = () => {
-    const { contacts, filter } = this.state;
+  const getVisibleContacts = () => {
     if (!filter) {
       return contacts;
     }
     const normFilter = filter.toLowerCase();
-    return contacts.filter(({name}) => name.toLowerCase().includes(normFilter));
-  }
+    return contacts.filter(({ name }) => name.toLowerCase().includes(normFilter));
+  };
 
-  render() {
-    const { filter } = this.state;
-    const visibleContacts = this.getVisibleContacts();
+  const visibleContacts = useMemo(getVisibleContacts, [contacts, filter]);
 
-    return (
-      <Layout>
-        <h1>Phonebook</h1>
-        <ContactForm onAddContact={this.handleAddContact}/>
-        <h2>Contacts</h2>
-        <Filter filter={filter} onChange={this.onFilterChange} />
-        <ContactList contacts={visibleContacts} onDeleteContact={this.handleDeleteContact} />
-      </Layout>
-    );
-  }  
+  return (
+    <Layout>
+      <h1>Phonebook</h1>
+      <ContactForm onAddContact={handleAddContact}/>
+      <h2>Contacts</h2>
+      <Filter filter={filter} onChange={onFilterChange} />
+      <ContactList contacts={visibleContacts} onDeleteContact={handleDeleteContact} />
+    </Layout>
+  );
 };
